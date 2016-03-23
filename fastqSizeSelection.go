@@ -3,9 +3,9 @@ package main
 import (
 	"bufio"
 	"compress/gzip"
+	"flag"
 	"fmt"
 	"os"
-	"flag"
 )
 
 func readGzFile(filename, filenameout string, min, max int) error {
@@ -24,7 +24,7 @@ func readGzFile(filename, filenameout string, min, max int) error {
 	// init writing the gzipped output file
 	fo, err := os.Create(filenameout)
 	if err != nil {
-		return err 
+		return err
 	}
 	defer fo.Close()
 	fzo := gzip.NewWriter(fo)
@@ -39,8 +39,8 @@ func readGzFile(filename, filenameout string, min, max int) error {
 			1: header line
 			2: sequence line
 			3: header line (may only be "+")
-			4: phred quality score line 
-		must parse through the file 4 lines at a time 
+			4: phred quality score line
+		must parse through the file 4 lines at a time
 		*/
 		header := scanner.Text()
 		scanner.Scan()
@@ -51,15 +51,14 @@ func readGzFile(filename, filenameout string, min, max int) error {
 		quality := scanner.Text()
 		// check if this read meets our size requirements
 		if len(sequence) >= min && len(sequence) <= max {
-			for _,line := range([]string{header, sequence, bonus, quality}) {
+			for _, line := range []string{header, sequence, bonus, quality} {
 				//fmt.Println(line)
-				fzo.Write([]byte(line+"\n"))
+				fzo.Write([]byte(line + "\n"))
 			}
 		}
 	}
 	return nil
 }
-
 
 func main() {
 	flagFastq := flag.String("fastq", "", "fastq.gz sequence file")
@@ -69,7 +68,7 @@ func main() {
 	flag.Parse()
 	// maybe do arg checking someday
 
-	if _,err := os.Stat(*flagFastq); err != nil {
+	if _, err := os.Stat(*flagFastq); err != nil {
 		abort(err)
 	}
 
