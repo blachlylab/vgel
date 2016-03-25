@@ -8,10 +8,10 @@ import (
 )
 
 type FastQrecord struct {
-	header string
-	sequence string
-	bonus string
-	quality string
+	header []byte
+	sequence []byte
+	bonus []byte
+	quality []byte
 }
 
 
@@ -48,28 +48,44 @@ func main() {
 	
 	scanner := bufio.NewScanner(fi)
 	// Set up a fixed buffer to avoid allocations
-	scanbuf := make([]byte, 4096);
-	scanner.Buffer(scanbuf, 4096);
+	//scanbuf := make([]byte, 16384);
+	//scanner.Buffer(scanbuf, 16384);
+	
+	writer := bufio.NewWriterSize(fo, 65536);
 
+	// Set up slices in fqrecord
+	fqrecord := FastQrecord{}
+	fqrecord.header = make([]byte, 1024);
+	fqrecord.sequence = make([]byte, 1024);
+	fqrecord.bonus = make([]byte, 1024);
+	fqrecord.quality = make([]byte, 1024);
+	
+	var headlen, seqlen, bonuslen, quallen int;
+
+	newline := []byte("\n")
+	
 	for scanner.Scan() {
-		fqrecord := FastQrecord{"", "", "", ""}
-		fqrecord.header = scanner.Text()
+		// first Scan() already done
+		headlen = copy(fqrecord.header, scanner.Bytes())
 		
 		scanner.Scan()
-		fqrecord.sequence = scanner.Text()
-		
-		scanner.Scan()
-		fqrecord.bonus = scanner.Text()
-		
-		scanner.Scan()
-		fqrecord.quality = scanner.Text()
-		
-		if len(fqrecord.sequence) >= minLen && len(fqrecord.sequence) <= maxLen {
-			fo.Write( []byte(fqrecord.header + "\n") );
-			fo.Write( []byte(fqrecord.sequence + "\n") );
-			fo.Write( []byte(fqrecord.bonus + "\n") );
-			fo.Write( []byte(fqrecord.quality + "\n") );
+		seqlen = copy(fqrecord.sequence, scanner.Bytes())
 
+		scanner.Scan()
+		bonuslen = copy(fqrecord.bonus, scanner.Bytes())
+		
+		scanner.Scan()
+		quallen = copy(fqrecord.quality, scanner.Bytes())
+		
+		if seqlen >= minLen && seqlen <= maxLen {
+			writer.Write( fqrecord.header[0:headlen]  );
+			writer.Write( newline );
+			writer.Write( fqrecord.sequence[0:seqlen] );
+			writer.Write( newline );
+			writer.Write( fqrecord.bonus[0:bonuslen] );
+			writer.Write( newline );
+			writer.Write( fqrecord.quality[0:quallen] );
+			writer.Write( newline );
 		}
 	
 	}
