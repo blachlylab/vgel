@@ -34,6 +34,17 @@ func readGzFile(filename, filenameout string, min, max int) error {
 	defer fzo.Close()
 
 	scanner := bufio.NewScanner(fz)
+	// Set up a fixed buffer to avoid allocations
+	scanbuf := make([]byte, 4096);
+	scanner.Buffer(scanbuf, 4096);
+
+	header := make([]byte, 1024);
+	sequence := make([]byte, 1024);
+	bonus := make([]byte, 1024);
+	quality := make([]byte, 1024);
+	
+	var headlen, seqlen, bonuslen, quallen int;
+	
 	for scanner.Scan() {
 		/* fastq format :
 			1: header line
@@ -42,19 +53,37 @@ func readGzFile(filename, filenameout string, min, max int) error {
 			4: phred quality score line
 		must parse through the file 4 lines at a time
 		*/
-		header := scanner.Text()
+		
+		// for loop performs initial Scan()
+		headlen = copy(header, scanner.Bytes());
+		
 		scanner.Scan()
-		sequence := scanner.Text()
+		seqlen = copy(sequence, scanner.Bytes());
+		
 		scanner.Scan()
-		bonus := scanner.Text()
+		bonuslen = copy(bonus, scanner.Bytes());
+		
 		scanner.Scan()
-		quality := scanner.Text()
+		quallen = copy(quality, scanner.Bytes());
+		
 		// check if this read meets our size requirements
-		if len(sequence) >= min && len(sequence) <= max {
-			for _, line := range []string{header, sequence, bonus, quality} {
+		if seqlen >= min && seqlen <= max {
+			fzo.Write(header[0:headlen])
+			fzo.Write([]byte("\n"))
+			
+			fzo.Write(sequence[0:seqlen])
+			fzo.Write([]byte("\n"))
+			
+			fzo.Write(bonus[0:bonuslen])
+			fzo.Write([]byte("\n"))
+			
+			fzo.Write(quality[0:quallen])
+			fzo.Write([]byte("\n"))
+			/*
+			for _, line := range [][]byte{header, sequence, bonus, quality} {
 				//fmt.Println(line)
-				fzo.Write([]byte(line + "\n"))
-			}
+				fzo.Write([]byte(line + []byte("\n")))
+			} */
 		}
 	}
 	return nil
