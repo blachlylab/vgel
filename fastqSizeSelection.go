@@ -6,87 +6,64 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sync"
 )
 
-func readGzFile(filename, filenameout string, min, max int) error {
+var wg sync.WaitGroup;
+
+func readGzFile(filename string, inputlines chan <- string) {
 	// read the gzipped input file
 	fi, err := os.Open(filename)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	defer fi.Close()
 	fz, err := gzip.NewReader(fi)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	defer fz.Close()
 
-	// init writing the gzipped output file
-	fo, err := os.Create(filenameout)
-	if err != nil {
-		return err
-	}
-	defer fo.Close()
-	fzo := gzip.NewWriter(fo)
-	if err != nil {
-		return err
-	}
-	defer fzo.Close()
 
 	scanner := bufio.NewScanner(fz)
 	// Set up a fixed buffer to avoid allocations
 	scanbuf := make([]byte, 4096);
 	scanner.Buffer(scanbuf, 4096);
 
-	header := make([]byte, 1024);
-	sequence := make([]byte, 1024);
-	bonus := make([]byte, 1024);
-	quality := make([]byte, 1024);
-	
-	var headlen, seqlen, bonuslen, quallen int;
-	
 	for scanner.Scan() {
-		/* fastq format :
-			1: header line
-			2: sequence line
-			3: header line (may only be "+")
-			4: phred quality score line
-		must parse through the file 4 lines at a time
-		*/
-		
-		// for loop performs initial Scan()
-		headlen = copy(header, scanner.Bytes());
-		
-		scanner.Scan()
-		seqlen = copy(sequence, scanner.Bytes());
-		
-		scanner.Scan()
-		bonuslen = copy(bonus, scanner.Bytes());
-		
-		scanner.Scan()
-		quallen = copy(quality, scanner.Bytes());
-		
-		// check if this read meets our size requirements
-		if seqlen >= min && seqlen <= max {
-			fzo.Write(header[0:headlen])
-			fzo.Write([]byte("\n"))
-			
-			fzo.Write(sequence[0:seqlen])
-			fzo.Write([]byte("\n"))
-			
-			fzo.Write(bonus[0:bonuslen])
-			fzo.Write([]byte("\n"))
-			
-			fzo.Write(quality[0:quallen])
-			fzo.Write([]byte("\n"))
-			/*
-			for _, line := range [][]byte{header, sequence, bonus, quality} {
-				//fmt.Println(line)
-				fzo.Write([]byte(line + []byte("\n")))
-			} */
+		inputlines <- scanner.Text()
+	}
+	close(inputlines)
+}
+
+func checkLines(minLen int, maxLen int, inputlines <- chan string, passedlines chan <- string) {
+	for fqline := range inputlines {
+		if len(fqline) >= minLen && len(fqline) <= maxLen {
+			passedlines <- fqline
 		}
 	}
-	return nil
+	close(passedlines)
+}
+
+func writeGzFile(outFile string, passedlines <- chan string) {
+	// init writing the gzipped output file
+	fo, err := os.Create(outFile)
+	if err != nil {
+		panic(err)
+	}
+	defer fo.Close()
+	fzo := gzip.NewWriter(fo)
+	if err != nil {
+		panic(err)
+	}
+	defer fzo.Close()
+	
+	for fqline := range passedlines {
+		fzo.Write( []byte(fqline + "\n") );
+	}
+
+	// release the Wait() in main()
+	wg.Done()
 }
 
 func main() {
@@ -100,12 +77,19 @@ func main() {
 	if _, err := os.Stat(*flagFastq); err != nil {
 		abort(err)
 	}
+	
+	inputlines := make(chan string, 400)
+	passedlines := make(chan string, 400)
 
 	info("processing " + *flagFastq)
-	err := readGzFile(*flagFastq, *flagOut, *flagMin, *flagMax)
-	if err != nil {
-		abort(err)
-	}
+	
+	wg.Add(1) // will wait for writeGzFile to call done
+	go readGzFile(*flagFastq, inputlines);
+	go checkLines(*flagMin, *flagMax, inputlines, passedlines);
+	go writeGzFile(*flagOut, passedlines);
+	
+	wg.Wait()
+
 }
 
 func info(message string) {
