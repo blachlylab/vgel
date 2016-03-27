@@ -8,16 +8,24 @@ import (
 	"sync"
 )
 
-var wg sync.WaitGroup;
+// import gzip "github.com/klauspost/pgzip"
+
+var wg sync.WaitGroup
+var mutex = &sync.Mutex{}
 
 type FastQrecord struct {
-	header string
-	sequence string
-	bonus string
-	quality string
+	header   []byte
+	sequence []byte
+	bonus    []byte
+	quality  []byte
+
+	headlen  int
+	seqlen   int
+	bonuslen int
+	quallen  int
 }
 
-func readGzFile(filename string, inputlines chan <- FastQrecord) {
+func readGzFile(filename string, minLen int, maxLen int, passedlines chan<- FastQrecord) {
 	// read the gzipped input file
 	fi, err := os.Open(filename)
 	if err != nil {
@@ -25,46 +33,55 @@ func readGzFile(filename string, inputlines chan <- FastQrecord) {
 	}
 	defer fi.Close()
 	/*
-	fz, err := gzip.NewReader(fi)
-	if err != nil {
-		panic(err)
-	}
-	defer fz.Close()
+		fiz, err := gzip.NewReaderN(fi, 524288, 48)
+		if err != nil {
+			panic(err)
+		}
+		defer fiz.Close()
 	*/
+	fiz := fi
+	scanner := bufio.NewScanner(fiz)
 
-	scanner := bufio.NewScanner(fi)
-	// Set up a fixed buffer to avoid allocations
-	scanbuf := make([]byte, 4096);
-	scanner.Buffer(scanbuf, 4096);
+	fqrecord := FastQrecord{}
+	fqrecord.header = make([]byte, 1024)
+	fqrecord.sequence = make([]byte, 1024)
+	fqrecord.bonus = make([]byte, 1024)
+	fqrecord.quality = make([]byte, 1024)
 
 	for scanner.Scan() {
-		fqrecord := FastQrecord{"", "", "", ""}
-		fqrecord.header = scanner.Text()
-		
-		scanner.Scan()
-		fqrecord.sequence = scanner.Text()
-		
-		scanner.Scan()
-		fqrecord.bonus = scanner.Text()
-		
-		scanner.Scan()
-		fqrecord.quality = scanner.Text()
-		
-		inputlines <- fqrecord
-	}
-	close(inputlines)
-}
+		mutex.Lock()
+		fqrecord.headlen = copy(fqrecord.header, scanner.Bytes())
 
-func checkLines(minLen int, maxLen int, inputlines <- chan FastQrecord, passedlines chan <- FastQrecord) {
-	for fqrecord := range inputlines {
-		if len(fqrecord.sequence) >= minLen && len(fqrecord.sequence) <= maxLen {
+		scanner.Scan()
+		fqrecord.seqlen = copy(fqrecord.sequence, scanner.Bytes())
+
+		scanner.Scan()
+		fqrecord.bonuslen = copy(fqrecord.bonus, scanner.Bytes())
+
+		scanner.Scan()
+		fqrecord.quallen = copy(fqrecord.quality, scanner.Bytes())
+
+		if fqrecord.seqlen >= minLen && fqrecord.seqlen <= maxLen {
 			passedlines <- fqrecord
+		} else {
+			mutex.Unlock()
 		}
 	}
 	close(passedlines)
 }
 
-func writeGzFile(outFile string, passedlines <- chan FastQrecord) {
+//func checkLines(minLen int, maxLen int, inputlines <-chan FastQrecord, passedlines chan<- FastQrecord) {
+//	for fqrecord := range inputlines {
+//		if fqrecord.seqlen >= minLen && fqrecord.seqlen <= maxLen {
+//			passedlines <- fqrecord
+//		} else {
+//			mutex.Unlock()
+//		}
+//	}
+//	close(passedlines)
+//}
+
+func writeGzFile(outFile string, passedlines <-chan FastQrecord) {
 	// init writing the gzipped output file
 	fo, err := os.Create(outFile)
 	if err != nil {
@@ -72,18 +89,29 @@ func writeGzFile(outFile string, passedlines <- chan FastQrecord) {
 	}
 	defer fo.Close()
 	/*
-	fzo := gzip.NewWriter(fo)
-	if err != nil {
-		panic(err)
-	}
-	defer fzo.Close()
+		foz := gzip.NewWriter(fo)
+		if err != nil {
+			panic(err)
+		}
+		defer foz.Close()
+		foz.SetConcurrency(524288, 48)
 	*/
-
+	foz := fo
+	newline := []byte("\n")
 	for fqrecord := range passedlines {
-		fo.Write( []byte(fqrecord.header + "\n") );
-		fo.Write( []byte(fqrecord.sequence + "\n") );
-		fo.Write( []byte(fqrecord.bonus + "\n") );
-		fo.Write( []byte(fqrecord.sequence + "\n") );
+		foz.Write(fqrecord.header[0:fqrecord.headlen])
+		foz.Write(newline)
+
+		foz.Write(fqrecord.sequence[0:fqrecord.seqlen])
+		foz.Write(newline)
+
+		foz.Write(fqrecord.bonus[0:fqrecord.bonuslen])
+		foz.Write(newline)
+
+		foz.Write(fqrecord.quality[0:fqrecord.quallen])
+		foz.Write(newline)
+
+		mutex.Unlock()
 	}
 
 	// release the Wait() in main()
@@ -101,17 +129,16 @@ func main() {
 	if _, err := os.Stat(*flagFastq); err != nil {
 		abort(err)
 	}
-	
-	inputlines := make(chan FastQrecord, 16000)
+
 	passedlines := make(chan FastQrecord, 16000)
 
 	info("processing " + *flagFastq)
-	
+
 	wg.Add(1) // will wait for writeGzFile to call done
-	go readGzFile(*flagFastq, inputlines);
-	go checkLines(*flagMin, *flagMax, inputlines, passedlines);
-	go writeGzFile(*flagOut, passedlines);
-	
+	go readGzFile(*flagFastq, *flagMin, *flagMax, passedlines)
+	//go checkLines(*flagMin, *flagMax, inputlines, passedlines)
+	go writeGzFile(*flagOut, passedlines)
+
 	wg.Wait()
 
 }
