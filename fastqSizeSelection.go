@@ -97,23 +97,25 @@ func writeGzFile(outFile string, passedlines <-chan FastQrecord) {
 		foz.SetConcurrency(524288, 48)
 	*/
 	foz := fo
+	writer := bufio.NewWriterSize(foz, 65536)
+
 	newline := []byte("\n")
 	for fqrecord := range passedlines {
-		foz.Write(fqrecord.header[0:fqrecord.headlen])
-		foz.Write(newline)
+		writer.Write(fqrecord.header[0:fqrecord.headlen])
+		writer.Write(newline)
 
-		foz.Write(fqrecord.sequence[0:fqrecord.seqlen])
-		foz.Write(newline)
+		writer.Write(fqrecord.sequence[0:fqrecord.seqlen])
+		writer.Write(newline)
 
-		foz.Write(fqrecord.bonus[0:fqrecord.bonuslen])
-		foz.Write(newline)
+		writer.Write(fqrecord.bonus[0:fqrecord.bonuslen])
+		writer.Write(newline)
 
-		foz.Write(fqrecord.quality[0:fqrecord.quallen])
-		foz.Write(newline)
+		writer.Write(fqrecord.quality[0:fqrecord.quallen])
+		writer.Write(newline)
 
 		mutex.Unlock()
 	}
-
+	writer.Flush()
 	// release the Wait() in main()
 	wg.Done()
 }

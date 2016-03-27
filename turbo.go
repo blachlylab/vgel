@@ -87,6 +87,7 @@ func main() {
 		}
 
 	}
+	writer.Flush()
 
 }
 
