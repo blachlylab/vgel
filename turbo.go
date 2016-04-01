@@ -16,7 +16,7 @@ type FastQrecord struct {
 
 func main() {
 	flagFastq := flag.String("fastq", "", "fastq.gz sequence file")
-	flagOut := flag.String("out", "output.fastq.gz", "output file name")
+	flagOut := flag.String("out", "", "output file name")
 	flagMax := flag.Int("max", 1000, "max read length size")
 	flagMin := flag.Int("min", 0, "min read length size")
 	flag.Parse()
@@ -24,23 +24,38 @@ func main() {
 	minLen := *flagMin
 	maxLen := *flagMax
 
-	if _, err := os.Stat(*flagFastq); err != nil {
-		abort(err)
-	}
-
-	info("processing " + *flagFastq)
+	var err error
 
 	// read the input file
-	fi, err := os.Open(*flagFastq)
-	if err != nil {
-		panic(err)
+	var fi *os.File 
+	if *flagFastq != "" {
+		info("processing " + *flagFastq)
+		if _, err = os.Stat(*flagFastq); err != nil {
+			panic(err)
+		}
+		fi, err = os.Open(*flagFastq)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		//read from stdin 
+		info("processing STDIN")
+		fi = os.Stdin
 	}
 	defer fi.Close()
 
 	// init writing the output file
-	fo, err := os.Create(*flagOut)
-	if err != nil {
-		panic(err)
+	var fo *os.File
+	if *flagOut != "" {
+		fo, err = os.Create(*flagOut)
+		if err != nil {
+			panic(err)
+		} else {
+			info("writing to " + *flagOut)
+		}
+	} else {
+		info("writing to STDOUT")
+		fo = os.Stdout
 	}
 	defer fo.Close()
 
@@ -92,14 +107,14 @@ func main() {
 }
 
 func info(message string) {
-	fmt.Println("[ok] " + message)
+	fmt.Fprintln(os.Stderr, "[ok] " + message)
 }
 
 func warn(message string) {
-	fmt.Println("[* ] " + message)
+	fmt.Fprintln(os.Stderr, "[* ] " + message)
 }
 
 func abort(message error) {
-	fmt.Println("[!!] " + message.Error())
+	fmt.Fprintln(os.Stderr, "[!!] " + message.Error())
 	os.Exit(1)
 }
