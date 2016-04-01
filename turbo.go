@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 )
 
 type FastQrecord struct {
@@ -17,6 +18,7 @@ type FastQrecord struct {
 func main() {
 	flagFastq := flag.String("fastq", "", "fastq.gz sequence file")
 	flagOut := flag.String("out", "", "output file name")
+	flagHist := flag.Bool("hist", false, "write histogram of observed read lengths")
 	flagMax := flag.Int("max", 1000, "max read length size")
 	flagMin := flag.Int("min", 0, "min read length size")
 	flag.Parse()
@@ -76,6 +78,7 @@ func main() {
 	var headlen, seqlen, bonuslen, quallen int
 
 	newline := []byte("\n")
+	seqLenMap := make(map[int]int)
 
 	for scanner.Scan() {
 		// first Scan() already done
@@ -83,6 +86,9 @@ func main() {
 
 		scanner.Scan()
 		seqlen = copy(fqrecord.sequence, scanner.Bytes())
+		if *flagHist == true {
+			seqLenMap[seqlen] += 1
+		}
 
 		scanner.Scan()
 		bonuslen = copy(fqrecord.bonus, scanner.Bytes())
@@ -103,7 +109,26 @@ func main() {
 
 	}
 	writer.Flush()
+	if *flagHist == true {
+		info("printing histogram")
+		writeHist(seqLenMap)
+	}
+}
 
+func writeHist(seqLenMap map[int]int) {
+	keys := make([]int, len(seqLenMap))
+	i := 0 
+	for k := range(seqLenMap) {
+		keys[i] = k
+		i++
+	}
+	sort.Ints(keys)
+	fmt.Fprintln(os.Stderr, "\n")
+	fmt.Fprintln(os.Stderr, "len", "count")
+	for _,seqLen := range(keys) {
+		fmt.Fprintln(os.Stderr, seqLen, seqLenMap[seqLen])
+	}
+	fmt.Fprintln(os.Stderr, "\n")
 }
 
 func info(message string) {
