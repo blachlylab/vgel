@@ -2,3 +2,4 @@
 *.fastq.gz
 turbo
 fastqSizeSelection
+vendor/

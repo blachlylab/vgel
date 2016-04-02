@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 )
+
+import "github.com/codegangsta/cli"
 
 type FastQrecord struct {
 	header   []byte
@@ -16,47 +19,105 @@ type FastQrecord struct {
 }
 
 func main() {
-	flagFastq := flag.String("fastq", "", "fastq.gz sequence file")
-	flagOut := flag.String("out", "", "output file name")
+
+	var minLen, maxLen int
+	var input, output string
+
+	app := cli.NewApp()
+	app.Name = "vgel"
+	app.Usage = "Virtual Gel"
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:        "input, i",
+			Usage:       "input FASTQ (default: stdin)",
+			Destination: &input,
+		},
+		cli.StringFlag{
+			Name:        "output, o",
+			Usage:       "output FASTQ (default: stdout)",
+			Destination: &output,
+		},
+		cli.IntFlag{
+			Name:        "min, m",
+			Usage:       "Minimum fragment length to consider",
+			Destination: &minLen,
+		},
+		cli.IntFlag{
+			Name:        "max, M",
+			Usage:       "Maximum fragment length to consider",
+			Destination: &maxLen,
+		},
+	}
+	app.Commands = []cli.Command{
+		{
+			Category: "Alter sequences",
+			Name:     "extract",
+			Aliases:  []string{"ext"},
+			Usage:    "Extract specific sequences for analysis",
+			Action: func(c *cli.Context) {
+				fmt.Println("Task: ", c.Args().First())
+			},
+		},
+		{
+			Category: "Alter sequences",
+			Name:     "excise",
+			Aliases:  []string{"exc"},
+			Usage:    "Excise and discard specific sequences",
+			Action: func(c *cli.Context) {
+				fmt.Println("Task: ", c.Args().First())
+			},
+		},
+		{
+			Name:     "histogram",
+			Category: "Examine sequences",
+			Aliases:  []string{"hist"},
+			Usage:    "Display histogram of fragment lengths",
+			Action: func(c *cli.Context) {
+				fmt.Println("Task: ", c.Args().First())
+			},
+		},
+	}
+
+	app.Action = func(c *cli.Context) {
+		info("app.Action() setup ⚙ ")
+		info("Minimum length: " + strconv.Itoa(minLen))
+		info("Maximum length: " + strconv.Itoa(maxLen))
+	}
+	app.Run(os.Args)
+
 	flagHist := flag.Bool("hist", false, "write histogram of observed read lengths")
-	flagMax := flag.Int("max", 1000, "max read length size")
-	flagMin := flag.Int("min", 0, "min read length size")
-	flag.Parse()
-	// maybe do arg checking someday
-	minLen := *flagMin
-	maxLen := *flagMax
 
 	var err error
 
 	// read the input file
-	var fi *os.File 
-	if *flagFastq != "" {
-		info("processing " + *flagFastq)
-		if _, err = os.Stat(*flagFastq); err != nil {
+	var fi *os.File
+	if input != "" {
+		info("processing " + input)
+		if _, err = os.Stat(input); err != nil {
 			panic(err)
 		}
-		fi, err = os.Open(*flagFastq)
+		fi, err = os.Open(input)
 		if err != nil {
 			panic(err)
 		}
 	} else {
-		//read from stdin 
-		info("processing STDIN")
+		//read from stdin
+		info("processing stdin")
 		fi = os.Stdin
 	}
 	defer fi.Close()
 
 	// init writing the output file
 	var fo *os.File
-	if *flagOut != "" {
-		fo, err = os.Create(*flagOut)
+	if output != "" {
+		fo, err = os.Create(output)
 		if err != nil {
 			panic(err)
 		} else {
-			info("writing to " + *flagOut)
+			info("writing to " + output)
 		}
 	} else {
-		info("writing to STDOUT")
+		info("writing to stdout")
 		fo = os.Stdout
 	}
 	defer fo.Close()
@@ -117,29 +178,29 @@ func main() {
 
 func writeHist(seqLenMap map[int]int) {
 	keys := make([]int, len(seqLenMap))
-	i := 0 
-	for k := range(seqLenMap) {
+	i := 0
+	for k := range seqLenMap {
 		keys[i] = k
 		i++
 	}
 	sort.Ints(keys)
 	fmt.Fprintln(os.Stderr, "\n")
 	fmt.Fprintln(os.Stderr, "len", "count")
-	for _,seqLen := range(keys) {
+	for _, seqLen := range keys {
 		fmt.Fprintln(os.Stderr, seqLen, seqLenMap[seqLen])
 	}
 	fmt.Fprintln(os.Stderr, "\n")
 }
 
 func info(message string) {
-	fmt.Fprintln(os.Stderr, "[ok] " + message)
+	fmt.Fprintln(os.Stderr, "[ok] "+message)
 }
 
 func warn(message string) {
-	fmt.Fprintln(os.Stderr, "[* ] " + message)
+	fmt.Fprintln(os.Stderr, "[* ] "+message)
 }
 
 func abort(message error) {
-	fmt.Fprintln(os.Stderr, "[!!] " + message.Error())
+	fmt.Fprintln(os.Stderr, "[☠ ] "+message.Error())
 	os.Exit(1)
 }
