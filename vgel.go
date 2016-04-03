@@ -61,17 +61,13 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		{
-			Category: "Alter sequences",
-			Name:     "extract",
-			Aliases:  []string{"ext"},
-			Usage:    "Extract specific sequences for analysis",
-			Action:   vgel,
+			Name:   "keep",
+			Usage:  "Extract specific sequences for analysis",
+			Action: vgel,
 		},
 		{
-			Category: "Alter sequences",
-			Name:     "excise",
-			Aliases:  []string{"exc"},
-			Usage:    "Excise and discard specific sequences",
+			Name:  "discard",
+			Usage: "Excise and discard specific sequences",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "save, s",
@@ -82,11 +78,9 @@ func main() {
 			Action: vgel,
 		},
 		{
-			Category: "Examine sequences",
-			Name:     "histogram",
-			Aliases:  []string{"hist", "histo"},
-			Usage:    "Display histogram of fragment lengths",
-			Action:   vgel,
+			Name:   "examine",
+			Usage:  "Display histogram of fragment lengths",
+			Action: vgel,
 		},
 	}
 	/*
@@ -201,15 +195,15 @@ func vgel(c *cli.Context) {
 			writer.Write(newline)
 		}
 		switch c.Command.Name {
-		case "extract":
+		case "keep":
 			if fqrecord.seqlen >= minLen && fqrecord.seqlen <= maxLen {
 				writeFQrecord(&fqrecord, writer)
 			}
-		case "excise":
+		case "discard":
 			if fqrecord.seqlen < minLen || fqrecord.seqlen > maxLen {
 				writeFQrecord(&fqrecord, writer)
 			}
-		case "histogram":
+		case "examine":
 			// don't write anything
 			// I am undecided whether should behave as extract, or ignore min/max
 		default: // this should never happen
@@ -220,7 +214,7 @@ func vgel(c *cli.Context) {
 		info("printing histogram")
 		writeHist(seqLenMap)
 	}
-	if c.Command.Name == "histogram" {
+	if c.Command.Name == "examine" {
 		info("printing barchart")
 		writeBarchart(seqLenArray)
 	}
