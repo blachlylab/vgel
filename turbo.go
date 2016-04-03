@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -20,32 +19,37 @@ type FastQrecord struct {
 
 func main() {
 
-	var minLen, maxLen int
-	var input, output string
-
 	app := cli.NewApp()
+	app.EnableBashCompletion = true
 	app.Name = "vgel"
 	app.Usage = "Virtual Gel"
+	app.Authors = []cli.Author{
+		{
+			Name:  "James S Blachly, MD",
+			Email: "james.blachly@gmail.com",
+		},
+		{
+			Name:  "Karl Kroll",
+			Email: "kwkroll32@gmail.com",
+		},
+	}
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:        "input, i",
-			Usage:       "input FASTQ (default: stdin)",
-			Destination: &input,
+			Name:  "input, i",
+			Usage: "input FASTQ (default: stdin)",
 		},
 		cli.StringFlag{
-			Name:        "output, o",
-			Usage:       "output FASTQ (default: stdout)",
-			Destination: &output,
+			Name:  "output, o",
+			Usage: "output FASTQ (default: stdout)",
 		},
 		cli.IntFlag{
-			Name:        "min, m",
-			Usage:       "Minimum fragment length to consider",
-			Destination: &minLen,
+			Name:  "min, m",
+			Usage: "Minimum fragment length to consider",
 		},
 		cli.IntFlag{
-			Name:        "max, M",
-			Usage:       "Maximum fragment length to consider",
-			Destination: &maxLen,
+			Name:  "max, M",
+			Usage: "Maximum fragment length to consider",
+			Value: 101,
 		},
 	}
 	app.Commands = []cli.Command{
@@ -54,40 +58,52 @@ func main() {
 			Name:     "extract",
 			Aliases:  []string{"ext"},
 			Usage:    "Extract specific sequences for analysis",
-			Action: func(c *cli.Context) {
-				fmt.Println("Task: ", c.Args().First())
-			},
+			Action:   vgel,
 		},
 		{
 			Category: "Alter sequences",
 			Name:     "excise",
 			Aliases:  []string{"exc"},
 			Usage:    "Excise and discard specific sequences",
-			Action: func(c *cli.Context) {
-				fmt.Println("Task: ", c.Args().First())
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "save, s",
+					Usage: "Save excised reads as FASTQ",
+					Value: "",
+				},
 			},
+			Action: vgel,
 		},
 		{
-			Name:     "histogram",
 			Category: "Examine sequences",
-			Aliases:  []string{"hist"},
+			Name:     "histogram",
+			Aliases:  []string{"hist", "histo"},
 			Usage:    "Display histogram of fragment lengths",
 			Action: func(c *cli.Context) {
 				fmt.Println("Task: ", c.Args().First())
 			},
 		},
 	}
-
-	app.Action = func(c *cli.Context) {
-		info("app.Action() setup ⚙ ")
-		info("Minimum length: " + strconv.Itoa(minLen))
-		info("Maximum length: " + strconv.Itoa(maxLen))
-	}
+	/*
+		app.Action = func(c *cli.Context) {
+			cli.ShowAppHelp(c)
+			info("app.Action() setup ⚙ ")
+			info("Will consider sequences in [" + strconv.Itoa(minLen) + ", " + strconv.Itoa(maxLen) + "] nt")
+		}
+	*/
+	app.Action = cli.ShowAppHelp
 	app.Run(os.Args)
+}
 
-	flagHist := flag.Bool("hist", false, "write histogram of observed read lengths")
-
+func vgel(c *cli.Context) {
 	var err error
+
+	input := c.GlobalString("input")
+	output := c.GlobalString("output")
+	minLen := c.GlobalInt("min")
+	maxLen := c.GlobalInt("max")
+
+	info("Will consider sequences in [" + strconv.Itoa(minLen) + ", " + strconv.Itoa(maxLen) + "] nt")
 
 	// read the input file
 	var fi *os.File
@@ -147,7 +163,7 @@ func main() {
 
 		scanner.Scan()
 		seqlen = copy(fqrecord.sequence, scanner.Bytes())
-		if *flagHist == true {
+		if true {
 			seqLenMap[seqlen] += 1
 		}
 
@@ -170,10 +186,11 @@ func main() {
 
 	}
 	writer.Flush()
-	if *flagHist == true {
+	if true {
 		info("printing histogram")
 		writeHist(seqLenMap)
 	}
+
 }
 
 func writeHist(seqLenMap map[int]int) {
