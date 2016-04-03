@@ -5,11 +5,11 @@
 ```
 COMMANDS:
   Alter sequences:
-    extract	Extract specific sequences for analysis
-    excise	Excise and discard specific sequences
+    keep	Extract specific sequences for analysis
+    discard	Excise and discard specific sequences
 
   Examine sequences:
-    histogram	Display histogram of fragment lengths
+    examine	Display histogram of fragment lengths
 
 GLOBAL OPTIONS:
    --input, -i 		input FASTQ (default: stdin)
