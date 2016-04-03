@@ -11,6 +11,10 @@ import (
 import "github.com/codegangsta/cli"
 
 type FastQrecord struct {
+	headlen  int
+	seqlen   int
+	bonuslen int
+	quallen  int
 	header   []byte
 	sequence []byte
 	bonus    []byte
@@ -103,6 +107,7 @@ func vgel(c *cli.Context) {
 	minLen := c.GlobalInt("min")
 	maxLen := c.GlobalInt("max")
 
+	info("Mode: " + c.Command.Name)
 	info("Will consider sequences in [" + strconv.Itoa(minLen) + ", " + strconv.Itoa(maxLen) + "] nt")
 
 	// read the input file
@@ -152,41 +157,51 @@ func vgel(c *cli.Context) {
 	fqrecord.bonus = make([]byte, 1024)
 	fqrecord.quality = make([]byte, 1024)
 
-	var headlen, seqlen, bonuslen, quallen int
-
 	newline := []byte("\n")
 	seqLenMap := make(map[int]int)
 
 	for scanner.Scan() {
 		// first Scan() already done
-		headlen = copy(fqrecord.header, scanner.Bytes())
+		fqrecord.headlen = copy(fqrecord.header, scanner.Bytes())
 
 		scanner.Scan()
-		seqlen = copy(fqrecord.sequence, scanner.Bytes())
+		fqrecord.seqlen = copy(fqrecord.sequence, scanner.Bytes())
 		if true {
-			seqLenMap[seqlen] += 1
+			seqLenMap[fqrecord.seqlen] += 1
 		}
 
 		scanner.Scan()
-		bonuslen = copy(fqrecord.bonus, scanner.Bytes())
+		fqrecord.bonuslen = copy(fqrecord.bonus, scanner.Bytes())
 
 		scanner.Scan()
-		quallen = copy(fqrecord.quality, scanner.Bytes())
+		fqrecord.quallen = copy(fqrecord.quality, scanner.Bytes())
 
-		if seqlen >= minLen && seqlen <= maxLen {
-			writer.Write(fqrecord.header[0:headlen])
+		// Write FastQ record to buffer
+		writeFQrecord := func(fqr *FastQrecord, writer *bufio.Writer) {
+			writer.Write(fqrecord.header[0:fqrecord.headlen])
 			writer.Write(newline)
-			writer.Write(fqrecord.sequence[0:seqlen])
+			writer.Write(fqrecord.sequence[0:fqrecord.seqlen])
 			writer.Write(newline)
-			writer.Write(fqrecord.bonus[0:bonuslen])
+			writer.Write(fqrecord.bonus[0:fqrecord.bonuslen])
 			writer.Write(newline)
-			writer.Write(fqrecord.quality[0:quallen])
+			writer.Write(fqrecord.quality[0:fqrecord.quallen])
 			writer.Write(newline)
+		}
+		switch c.Command.Name {
+		case "extract":
+			if fqrecord.seqlen >= minLen && fqrecord.seqlen <= maxLen {
+				writeFQrecord(&fqrecord, writer)
+			}
+		case "excise":
+			if fqrecord.seqlen < minLen || fqrecord.seqlen > maxLen {
+				writeFQrecord(&fqrecord, writer)
+			}
+		default: // this should never happen
 		}
 
 	}
 	writer.Flush()
-	if true {
+	if false {
 		info("printing histogram")
 		writeHist(seqLenMap)
 	}
