@@ -11,6 +11,8 @@ import (
 
 import "github.com/codegangsta/cli"
 
+import "github.com/aybabtme/uniplot/barchart"
+
 type FastQrecord struct {
 	headlen  int
 	seqlen   int
@@ -165,6 +167,11 @@ func vgel(c *cli.Context) {
 
 	newline := []byte("\n")
 	seqLenMap := make(map[int]int)
+	// probably a substantial speed boost to use an array,
+	// but limits the upper bound of fragment length, AND
+	// for safety will require an if fragLen > ARRAYMAX
+	// which may  mitigate some of the speed increase. Need testing.
+	var seqLenArray [1000]int
 
 	for scanner.Scan() {
 		// first Scan() already done
@@ -174,6 +181,7 @@ func vgel(c *cli.Context) {
 		fqrecord.seqlen = copy(fqrecord.sequence, scanner.Bytes())
 		if true {
 			seqLenMap[fqrecord.seqlen] += 1
+			seqLenArray[fqrecord.seqlen]++
 		}
 
 		scanner.Scan()
@@ -204,12 +212,57 @@ func vgel(c *cli.Context) {
 			}
 		default: // this should never happen
 		}
-
 	}
 	writer.Flush()
 	if false {
 		info("printing histogram")
 		writeHist(seqLenMap)
+	}
+	if true {
+		info("printing barchart")
+		writeBarchart(seqLenArray)
+	}
+
+}
+
+func writeBarchart(seqLenArray [1000]int) {
+	var start, end int
+
+	// Step 1. Find first and last nonzero entries in the array
+	// 1a. scan forwards
+	for k, v := range seqLenArray {
+		start = k
+		if v > 0 {
+			break
+		}
+	}
+
+	// 1b. scan backwards
+	for i := len(seqLenArray) - 1; i >= 0; i-- {
+		end = i
+		if seqLenArray[i] > 0 {
+			break
+		}
+	}
+
+	// Step 2. Make slice of [2]int arrays
+	// length = (end - start) + 1 (e.g. 9-0 + 1 = 10)
+	data := make([][2]int, (end-start)+1)
+
+	// Step 3. Populate the [2]int arrays from seqLenArray
+	i := 0
+	for j := start; j <= end; j++ {
+		data[i][0] = j
+		data[i][1] = seqLenArray[j]
+		i++
+	}
+	warn("Start: " + strconv.Itoa(start))
+	warn("End  : " + strconv.Itoa(end))
+	fmt.Fprintln(os.Stderr, seqLenArray)
+	fmt.Fprintln(os.Stderr, data)
+	plot := barchart.BarChartXYs(data)
+	if err := barchart.Fprint(os.Stderr, plot, barchart.Linear(65)); err != nil {
+		panic(err)
 	}
 
 }
