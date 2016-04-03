@@ -1,7 +1,7 @@
 import random
 
 with open('test.fastq','w') as fo:
-    for i in range(100000):
+    for i in range(1000000):
         rand_len = int(random.gauss(50, 10))
         
         fo.write("@JSB:1:FC000:1:{}:{}:{} 0:N:0:ACTG\n".format(str(rand_len), str(i), str(i)))

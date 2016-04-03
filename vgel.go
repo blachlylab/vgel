@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -106,6 +107,11 @@ func vgel(c *cli.Context) {
 	output := c.GlobalString("output")
 	minLen := c.GlobalInt("min")
 	maxLen := c.GlobalInt("max")
+
+	if input == output {
+		err := errors.New("input and output filenames shouldn't be the same")
+		abort(err)
+	}
 
 	info("Mode: " + c.Command.Name)
 	info("Will consider sequences in [" + strconv.Itoa(minLen) + ", " + strconv.Itoa(maxLen) + "] nt")
