@@ -28,7 +28,7 @@ func main() {
 
 	app := cli.NewApp()
 	app.Name = "vgel"
-	app.Version = "0.5.0"
+	app.Version = "0.6.0"
 	app.Usage = "Virtual Gel"
 	app.Authors = []cli.Author{
 		{
@@ -56,7 +56,7 @@ func main() {
 		cli.IntFlag{
 			Name:  "max, M",
 			Usage: "Maximum fragment length to consider",
-			Value: 101,
+			Value: 999, // max of seqLenArray
 		},
 	}
 	app.Commands = []cli.Command{
@@ -86,9 +86,7 @@ func main() {
 			Name:     "histogram",
 			Aliases:  []string{"hist", "histo"},
 			Usage:    "Display histogram of fragment lengths",
-			Action: func(c *cli.Context) {
-				fmt.Println("Task: ", c.Args().First())
-			},
+			Action:   vgel,
 		},
 	}
 	/*
@@ -110,7 +108,8 @@ func vgel(c *cli.Context) {
 	minLen := c.GlobalInt("min")
 	maxLen := c.GlobalInt("max")
 
-	if input == output {
+	// ok for input and output to both be left blank (stdin/stdout)
+	if input == output && input != "" {
 		err := errors.New("input and output filenames shouldn't be the same")
 		abort(err)
 	}
@@ -210,6 +209,9 @@ func vgel(c *cli.Context) {
 			if fqrecord.seqlen < minLen || fqrecord.seqlen > maxLen {
 				writeFQrecord(&fqrecord, writer)
 			}
+		case "histogram":
+			// don't write anything
+			// I am undecided whether should behave as extract, or ignore min/max
 		default: // this should never happen
 		}
 	}
@@ -218,7 +220,7 @@ func vgel(c *cli.Context) {
 		info("printing histogram")
 		writeHist(seqLenMap)
 	}
-	if true {
+	if c.Command.Name == "histogram" {
 		info("printing barchart")
 		writeBarchart(seqLenArray)
 	}
@@ -256,10 +258,6 @@ func writeBarchart(seqLenArray [1000]int) {
 		data[i][1] = seqLenArray[j]
 		i++
 	}
-	warn("Start: " + strconv.Itoa(start))
-	warn("End  : " + strconv.Itoa(end))
-	fmt.Fprintln(os.Stderr, seqLenArray)
-	fmt.Fprintln(os.Stderr, data)
 	plot := barchart.BarChartXYs(data)
 	if err := barchart.Fprint(os.Stderr, plot, barchart.Linear(65)); err != nil {
 		panic(err)
