@@ -11,6 +11,8 @@ import (
 
 import "github.com/codegangsta/cli"
 
+import "github.com/aybabtme/uniplot/barchart"
+
 type FastQrecord struct {
 	headlen  int
 	seqlen   int
@@ -26,7 +28,7 @@ func main() {
 
 	app := cli.NewApp()
 	app.Name = "vgel"
-	app.Version = "0.5.0"
+	app.Version = "0.6.0"
 	app.Usage = "Virtual Gel"
 	app.Authors = []cli.Author{
 		{
@@ -54,22 +56,18 @@ func main() {
 		cli.IntFlag{
 			Name:  "max, M",
 			Usage: "Maximum fragment length to consider",
-			Value: 101,
+			Value: 999, // max of seqLenArray
 		},
 	}
 	app.Commands = []cli.Command{
 		{
-			Category: "Alter sequences",
-			Name:     "extract",
-			Aliases:  []string{"ext"},
-			Usage:    "Extract specific sequences for analysis",
-			Action:   vgel,
+			Name:   "keep",
+			Usage:  "Extract specific sequences for analysis",
+			Action: vgel,
 		},
 		{
-			Category: "Alter sequences",
-			Name:     "excise",
-			Aliases:  []string{"exc"},
-			Usage:    "Excise and discard specific sequences",
+			Name:  "discard",
+			Usage: "Excise and discard specific sequences",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "save, s",
@@ -80,13 +78,10 @@ func main() {
 			Action: vgel,
 		},
 		{
-			Category: "Examine sequences",
-			Name:     "histogram",
-			Aliases:  []string{"hist", "histo"},
-			Usage:    "Display histogram of fragment lengths",
-			Action: func(c *cli.Context) {
-				fmt.Println("Task: ", c.Args().First())
-			},
+			Name:    "examine",
+			Aliases: []string{"ex", "histogram", "hist"},
+			Usage:   "Display histogram of fragment lengths",
+			Action:  vgel,
 		},
 	}
 	/*
@@ -108,7 +103,8 @@ func vgel(c *cli.Context) {
 	minLen := c.GlobalInt("min")
 	maxLen := c.GlobalInt("max")
 
-	if input == output {
+	// ok for input and output to both be left blank (stdin/stdout)
+	if input == output && input != "" {
 		err := errors.New("input and output filenames shouldn't be the same")
 		abort(err)
 	}
@@ -165,6 +161,11 @@ func vgel(c *cli.Context) {
 
 	newline := []byte("\n")
 	seqLenMap := make(map[int]int)
+	// probably a substantial speed boost to use an array,
+	// but limits the upper bound of fragment length, AND
+	// for safety will require an if fragLen > ARRAYMAX
+	// which may  mitigate some of the speed increase. Need testing.
+	var seqLenArray [1000]int
 
 	for scanner.Scan() {
 		// first Scan() already done
@@ -174,6 +175,7 @@ func vgel(c *cli.Context) {
 		fqrecord.seqlen = copy(fqrecord.sequence, scanner.Bytes())
 		if true {
 			seqLenMap[fqrecord.seqlen] += 1
+			seqLenArray[fqrecord.seqlen]++
 		}
 
 		scanner.Scan()
@@ -194,22 +196,66 @@ func vgel(c *cli.Context) {
 			writer.Write(newline)
 		}
 		switch c.Command.Name {
-		case "extract":
+		case "keep":
 			if fqrecord.seqlen >= minLen && fqrecord.seqlen <= maxLen {
 				writeFQrecord(&fqrecord, writer)
 			}
-		case "excise":
+		case "discard":
 			if fqrecord.seqlen < minLen || fqrecord.seqlen > maxLen {
 				writeFQrecord(&fqrecord, writer)
 			}
+		case "examine":
+			// don't write anything
+			// I am undecided whether should behave as extract, or ignore min/max
 		default: // this should never happen
 		}
-
 	}
 	writer.Flush()
 	if false {
 		info("printing histogram")
 		writeHist(seqLenMap)
+	}
+	if c.Command.Name == "examine" {
+		info("printing barchart")
+		writeBarchart(seqLenArray)
+	}
+
+}
+
+func writeBarchart(seqLenArray [1000]int) {
+	var start, end int
+
+	// Step 1. Find first and last nonzero entries in the array
+	// 1a. scan forwards
+	for k, v := range seqLenArray {
+		start = k
+		if v > 0 {
+			break
+		}
+	}
+
+	// 1b. scan backwards
+	for i := len(seqLenArray) - 1; i >= 0; i-- {
+		end = i
+		if seqLenArray[i] > 0 {
+			break
+		}
+	}
+
+	// Step 2. Make slice of [2]int arrays
+	// length = (end - start) + 1 (e.g. 9-0 + 1 = 10)
+	data := make([][2]int, (end-start)+1)
+
+	// Step 3. Populate the [2]int arrays from seqLenArray
+	i := 0
+	for j := start; j <= end; j++ {
+		data[i][0] = j
+		data[i][1] = seqLenArray[j]
+		i++
+	}
+	plot := barchart.BarChartXYs(data)
+	if err := barchart.Fprint(os.Stderr, plot, barchart.Linear(65)); err != nil {
+		panic(err)
 	}
 
 }
