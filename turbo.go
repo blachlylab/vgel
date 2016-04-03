@@ -24,8 +24,8 @@ type FastQrecord struct {
 func main() {
 
 	app := cli.NewApp()
-	app.EnableBashCompletion = true
 	app.Name = "vgel"
+	app.Version = "0.5.0"
 	app.Usage = "Virtual Gel"
 	app.Authors = []cli.Author{
 		{
