@@ -78,9 +78,10 @@ func main() {
 			Action: vgel,
 		},
 		{
-			Name:   "examine",
-			Usage:  "Display histogram of fragment lengths",
-			Action: vgel,
+			Name:    "examine",
+			Aliases: []string{"ex", "histogram", "hist"},
+			Usage:   "Display histogram of fragment lengths",
+			Action:  vgel,
 		},
 	}
 	/*
