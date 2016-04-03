@@ -1,12 +1,21 @@
-# fastq-size-selection
-Program to subset a fastq file to a particular range of read lengths
+# vgel: Virtual Gel
+`vgel` can extract and excise sequences within specific size ranges
 
-## Options
+## Usage
+```
+COMMANDS:
+  Alter sequences:
+    extract	Extract specific sequences for analysis
+    excise	Excise and discard specific sequences
 
--fastq, default="", fastq.gz sequence file
+  Examine sequences:
+    histogram	Display histogram of fragment lengths
 
--out, default="output.fastq.gz", output file name
-
--max, default=1000, max read length size
-
--min, default=0, min read length size
+GLOBAL OPTIONS:
+   --input, -i 		input FASTQ (default: stdin)
+   --output, -o 	output FASTQ (default: stdout)
+   --min, -m "0"	Minimum fragment length to consider
+   --max, -M "101"	Maximum fragment length to consider
+   --help, -h		show help
+   --version, -v	print the version
+```
