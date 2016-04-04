@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -106,26 +107,26 @@ func vgel(c *cli.Context) {
 	// ok for input and output to both be left blank (stdin/stdout)
 	if input == output && input != "" {
 		err := errors.New("input and output filenames shouldn't be the same")
-		abort(err)
+		fatal(err, c)
 	}
 
-	info("Mode: " + c.Command.Name)
-	info("Will consider sequences in [" + strconv.Itoa(minLen) + ", " + strconv.Itoa(maxLen) + "] nt")
+	//info("Mode set", c)
+	info("Will consider sequences in ["+strconv.Itoa(minLen)+", "+strconv.Itoa(maxLen)+"] nt", c)
 
 	// read the input file
 	var fi *os.File
 	if input != "" {
-		info("processing " + input)
+		info("reading from "+input, c)
 		if _, err = os.Stat(input); err != nil {
-			panic(err)
+			fatal(err, c)
 		}
 		fi, err = os.Open(input)
 		if err != nil {
-			panic(err)
+			fatal(err, c)
 		}
 	} else {
 		//read from stdin
-		info("processing stdin")
+		info("reading from stdin", c)
 		fi = os.Stdin
 	}
 	defer fi.Close()
@@ -135,12 +136,12 @@ func vgel(c *cli.Context) {
 	if output != "" {
 		fo, err = os.Create(output)
 		if err != nil {
-			panic(err)
+			fatal(err, c)
 		} else {
-			info("writing to " + output)
+			info("writing to "+output, c)
 		}
 	} else {
-		info("writing to stdout")
+		info("writing to stdout", c)
 		fo = os.Stdout
 	}
 	defer fo.Close()
@@ -212,17 +213,17 @@ func vgel(c *cli.Context) {
 	}
 	writer.Flush()
 	if false {
-		info("printing histogram")
+		info("printing histogram", c)
 		writeHist(seqLenMap)
 	}
 	if c.Command.Name == "examine" {
-		info("printing barchart")
-		writeBarchart(seqLenArray)
+		info("printing barchart", c)
+		writeBarchart(seqLenArray, c)
 	}
 
 }
 
-func writeBarchart(seqLenArray [1000]int) {
+func writeBarchart(seqLenArray [1000]int, c *cli.Context) {
 	var start, end int
 
 	// Step 1. Find first and last nonzero entries in the array
@@ -255,7 +256,7 @@ func writeBarchart(seqLenArray [1000]int) {
 	}
 	plot := barchart.BarChartXYs(data)
 	if err := barchart.Fprint(os.Stderr, plot, barchart.Linear(65)); err != nil {
-		panic(err)
+		fatal(err, c)
 	}
 
 }
@@ -276,15 +277,10 @@ func writeHist(seqLenMap map[int]int) {
 	fmt.Fprintln(os.Stderr, "\n")
 }
 
-func info(message string) {
-	fmt.Fprintln(os.Stderr, "[ok] "+message)
+func info(message string, c *cli.Context) {
+	log.Println("[" + c.Command.Name + "] " + message)
 }
 
-func warn(message string) {
-	fmt.Fprintln(os.Stderr, "[* ] "+message)
-}
-
-func abort(message error) {
-	fmt.Fprintln(os.Stderr, "[☠ ] "+message.Error())
-	os.Exit(1)
+func fatal(err error, c *cli.Context) {
+	log.Fatalln("[" + c.Command.Name + "][☠ ] " + err.Error())
 }
