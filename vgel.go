@@ -31,6 +31,7 @@ func main() {
 	app.Name = "vgel"
 	app.Version = "0.6.0"
 	app.Usage = "Virtual Gel"
+	app.Writer = os.Stderr
 	app.Authors = []cli.Author{
 		{
 			Name:  "James S Blachly, MD",
