@@ -11,8 +11,8 @@ import (
 
 // external imports
 import (
-    "github.com/codegangsta/cli"
-    "github.com/aybabtme/uniplot/barchart"
+	"github.com/aybabtme/uniplot/barchart"
+	"github.com/codegangsta/cli"
 )
 
 // FastQrecord is a struct to represent a single fastq entry
@@ -224,7 +224,6 @@ func vgel(c *cli.Context) {
 
 func writeBarchart(seqLenArray [1000]int, c *cli.Context) {
 	var start, end int
-
 	// Step 1. Find first and last nonzero entries in the array
 	// 1a. scan forwards
 	for k, v := range seqLenArray {
@@ -244,6 +243,9 @@ func writeBarchart(seqLenArray [1000]int, c *cli.Context) {
 
 	// Step 2. Make slice of [2]int arrays
 	// length = (end - start) + 1 (e.g. 9-0 + 1 = 10)
+	if start == end {
+		start--
+	}
 	data := make([][2]int, (end-start)+1)
 
 	// Step 3. Populate the [2]int arrays from seqLenArray
