@@ -1,19 +1,22 @@
 package main
 
+// native imports
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"log"
 	"os"
-	"sort"
 	"strconv"
 )
 
-import "github.com/codegangsta/cli"
+// external imports
+import (
+    "github.com/codegangsta/cli"
+    "github.com/aybabtme/uniplot/barchart"
+)
 
-import "github.com/aybabtme/uniplot/barchart"
-
+// FastQrecord is a struct to represent a single fastq entry
+// It contains a byte slice of each piece of the fastq entry, plus the length of each entry
 type FastQrecord struct {
 	headlen  int
 	seqlen   int
@@ -26,7 +29,6 @@ type FastQrecord struct {
 }
 
 func main() {
-
 	app := cli.NewApp()
 	app.Name = "vgel"
 	app.Version = "0.6.0"
@@ -176,7 +178,7 @@ func vgel(c *cli.Context) {
 		scanner.Scan()
 		fqrecord.seqlen = copy(fqrecord.sequence, scanner.Bytes())
 		if true {
-			seqLenMap[fqrecord.seqlen] += 1
+			seqLenMap[fqrecord.seqlen]++
 			seqLenArray[fqrecord.seqlen]++
 		}
 
@@ -213,10 +215,6 @@ func vgel(c *cli.Context) {
 		}
 	}
 	writer.Flush()
-	if false {
-		info("printing histogram", c)
-		writeHist(seqLenMap)
-	}
 	if c.Command.Name == "examine" {
 		info("printing barchart", c)
 		writeBarchart(seqLenArray, c)
@@ -260,22 +258,6 @@ func writeBarchart(seqLenArray [1000]int, c *cli.Context) {
 		fatal(err, c)
 	}
 
-}
-
-func writeHist(seqLenMap map[int]int) {
-	keys := make([]int, len(seqLenMap))
-	i := 0
-	for k := range seqLenMap {
-		keys[i] = k
-		i++
-	}
-	sort.Ints(keys)
-	fmt.Fprintln(os.Stderr, "\n")
-	fmt.Fprintln(os.Stderr, "len", "count")
-	for _, seqLen := range keys {
-		fmt.Fprintln(os.Stderr, seqLen, seqLenMap[seqLen])
-	}
-	fmt.Fprintln(os.Stderr, "\n")
 }
 
 func info(message string, c *cli.Context) {
